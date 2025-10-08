@@ -4,6 +4,7 @@ import { env } from "./config/env";
 import reviewsRouter from "./routes/reviews";
 import snippetsRouter from "./routes/snippets";
 import debugRouter from "./routes/debug";
+import historyRouter from "./routes/history";
 export function createApp() {
   const app = express();
 
@@ -33,7 +34,13 @@ export function createApp() {
   app.use("/api/reviews", reviewsRouter);
   app.use("/api/snippets", snippetsRouter);
   app.use("/api/debug", debugRouter);
+  app.use("/api/history", historyRouter);
 
+  app.use("/api/history", (req, res, next) => {
+    if (req.method.toUpperCase() !== "GET") return next();
+    req.url = "/"; // rewrite to /api/history
+    historyRouter(req, res, next);
+  });
   // final error handler
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: any, _req: any, res: any, _next: any) => {

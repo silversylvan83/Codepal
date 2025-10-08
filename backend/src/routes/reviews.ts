@@ -5,7 +5,7 @@ import { Review } from '../models/Review';
 import { env } from '../config/env';
 import mongoose from 'mongoose';
 import { parseGeminiReview } from '../utils/parseGeminiReview'; // if you added it; else remove parsing
-
+import { History } from '../models/History';
 const router = Router();
 
 /** POST /api/reviews
@@ -24,11 +24,11 @@ router.post('/', async (req, res) => {
     // Log mongoose state: 1=connected, 2=connecting, 0=disconnected, 3=disconnecting
     console.log('[reviews] mongoose readyState =', mongoose.connection.readyState);
 
-    // 1) Get review from LLM
+    // 1️⃣ Generate review text from LLM
     const reviewText = await reviewCodeLLM({ code, language });
     console.log('[reviews] got review length=', reviewText?.length);
 
-    // 2) (Optional) parse if you added parser; otherwise skip
+    // 2️⃣ Parse Gemini response (optional)
     let summary = '';
     let comments: any[] = [];
     let improvedSnippet = '';
@@ -43,11 +43,11 @@ router.post('/', async (req, res) => {
       console.warn('[reviews] parse skipped/failed:', (e as any)?.message);
     }
 
-    // 3) Save
-    let docId: string | null = null;
+    // 3️⃣ Save Review (optional)
+    let reviewDocId: string | null = null;
     if (save) {
       try {
-        const doc = await Review.create({
+        const reviewDoc = await Review.create({
           snippetId: snippetId || undefined,
           language,
           code,
@@ -58,65 +58,49 @@ router.post('/', async (req, res) => {
           provider: env.LLM_PROVIDER,
           model: env.LLM_MODEL,
         });
-        docId = doc._id.toString();
-        console.log('[reviews] saved review', docId);
+        reviewDocId = reviewDoc._id.toString();
+        console.log('[reviews] saved review', reviewDocId);
       } catch (e: any) {
         console.error('[reviews] save failed:', e?.message || e);
-        if (env.NODE_ENV !== 'production') {
-          return res.status(500).json({ error: 'DB save failed', details: e?.message || String(e) });
-        }
-        return res.status(500).json({ error: 'DB save failed' });
+        return res.status(500).json({ error: 'DB save failed', details: e?.message || String(e) });
       }
     }
 
-    // 4) Respond
+    // 4️⃣ Save to History (always)
+    try {
+      const hist = await History.create({
+        snippetId: snippetId || undefined,
+        reviewId: reviewDocId || undefined,
+        language,
+        code,
+        review: reviewText,
+        summary,
+        comments,
+        improvedSnippet,
+        provider: env.LLM_PROVIDER,
+        model: env.LLM_MODEL,
+      });
+      console.log('[history] saved entry', hist._id.toString());
+    } catch (e: any) {
+      console.error('[history] save failed:', e?.message || e);
+    }
+
+    // 5️⃣ Respond
     res.json({
       review: reviewText,
       summary,
       comments,
       improvedSnippet,
-      id: docId,
-      saved: Boolean(docId),
+      id: reviewDocId,
+      saved: Boolean(reviewDocId),
     });
   } catch (err: any) {
     console.error('[reviews] error:', err);
-    if (env.NODE_ENV !== 'production') {
-      return res.status(500).json({ error: 'Failed to review code', details: err?.message || String(err) });
-    }
-    res.status(500).json({ error: 'Failed to review code' });
-  }
-});
-router.get('/history', async (req, res) => {
-  try {
-    const limit = Math.min(Number(req.query.limit) || 20, 100);
-    const skip = Math.max(Number(req.query.skip) || 0, 0);
-    const language = req.query.language as string | undefined;
-
-    const filter = language ? { language } : {};
-
-    const reviews = await Review.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .select('language summary createdAt model provider'); // only what’s needed in UI
-
-    const total = await Review.countDocuments(filter);
-
-    res.json({
-      total,
-      count: reviews.length,
-      items: reviews.map((r) => ({
-        id: r._id,
-        language: r.language,
-        summary: r.summary || r.review.slice(0, 200),
-        createdAt: r.createdAt,
-        model: r.model,
-        provider: r.provider,
-      })),
+    res.status(500).json({
+      error: 'Failed to review code',
+      details: env.NODE_ENV !== 'production' ? err?.message || String(err) : undefined,
     });
-  } catch (err: any) {
-    console.error('[reviews] history error:', err);
-    res.status(500).json({ error: 'Failed to fetch review history' });
   }
 });
+
 export default router;
