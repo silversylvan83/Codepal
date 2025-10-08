@@ -16,3 +16,11 @@ export async function listReviews() {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+export async function getReviewHistory(params?: { limit?: number; skip?: number; language?: string }) {
+  const qs = new URLSearchParams(params as any).toString();
+  const res = await fetch(`${API}/api/reviews/history${qs ? `?${qs}` : ''}`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

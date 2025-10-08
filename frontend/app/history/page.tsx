@@ -3,45 +3,110 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Copy, Trash2, ArrowRight, Search, ChevronDown } from 'lucide-react'
-import { clearHistory, getHistory, HistoryItem, removeHistory } from '@/lib/history'
+import { getReviewHistory } from '@/lib/api'
+
 
 const LANGS = ['all', 'javascript', 'typescript', 'python', 'java', 'go', 'csharp'] as const
 
+export type HistoryItem = {
+  id: string
+  language?: string
+  summary?: string
+  code?: string
+  createdAt: string
+  model?: string
+  provider?: string
+}
+
 export default function HistoryPage() {
   const [items, setItems] = useState<HistoryItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
   const [lang, setLang] = useState<(typeof LANGS)[number]>('all')
 
-  useEffect(() => { setItems(getHistory()) }, [])
+  // fetch from backend history endpoint
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        setLoading(true)
+        const data = await getReviewHistory({ limit: 50 })
+        // Shape expected from backend:
+        // { total, count, items: [{ id, language, summary, createdAt, model, provider, (optional) code }] }
+        if (mounted) setItems(Array.isArray(data?.items) ? data.items : [])
+      } catch (e) {
+        console.error('Failed to load history:', e)
+        if (mounted) setItems([])
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   const filtered = useMemo(() => {
     let data = items
     if (lang !== 'all') data = data.filter((x) => x.language === lang)
     if (q.trim()) {
       const s = q.toLowerCase()
-      data = data.filter((x) => x.code.toLowerCase().includes(s))
+      data = data.filter(
+        (x) =>
+          (x.summary && x.summary.toLowerCase().includes(s)) ||
+          (x.code && x.code.toLowerCase().includes(s))
+      )
     }
     return data
   }, [items, q, lang])
 
-  function onClear() {
-    clearHistory()
-    setItems([])
-  }
+  // async function onClear() {
+  //   try {
+  //     await clearReviews() // DELETE /api/reviews
+  //     setItems([])
+  //   } catch (e) {
+  //     console.error('Failed to clear history:', e)
+  //     // optional: toast error
+  //   }
+  // }
 
-  async function onCopy(code: string) {
-    try { await navigator.clipboard.writeText(code) } catch {}
-  }
+  // async function onCopy(item: HistoryItem) {
+  //   try {
+  //     // prefer code if the endpoint provides it; else fetch the full doc
+  //     let code = item.code
+  //     if (!code) {
+  //       const full = await getReviewById(item.id) // GET /api/reviews/:id
+  //       code = full?.code || ''
+  //     }
+  //     if (!code) return
+  //     await navigator.clipboard.writeText(code)
+  //     // optional: toast success
+  //   } catch (e) {
+  //     console.error('Copy failed:', e)
+  //   }
+  // }
 
-  function onRemove(id: string) {
-    removeHistory(id)
-    setItems((prev) => prev.filter((x) => x.id !== id))
-  }
+  // async function onRemove(id: string) {
+  //   try {
+  //     await deleteReview(id) // DELETE /api/reviews/:id
+  //     setItems((prev) => prev.filter((x) => x.id !== id))
+  //   } catch (e) {
+  //     console.error('Failed to delete review:', e)
+  //   }
+  // }
 
-  function onLoadToReview(item: HistoryItem) {
-    // stash selection for Review page to pick up
-    localStorage.setItem('codepal:last', JSON.stringify({ code: item.code, language: item.language }))
-  }
+  // async function onLoadToReview(item: HistoryItem) {
+  //   try {
+  //     // fetch full record to ensure we have code + language
+  //     const full = await getReviewById(item.id) // GET /api/reviews/:id
+  //     const code = full?.code || item.code || ''
+  //     const language = full?.language || item.language || 'javascript'
+  //     if (!code) return
+  //     localStorage.setItem('codepal:last', JSON.stringify({ code, language }))
+  //   } catch (e) {
+  //     console.error('Failed to load detail:', e)
+  //   }
+  // }
 
   return (
     <main className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
@@ -49,7 +114,9 @@ export default function HistoryPage() {
         <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-xl font-semibold">History</h1>
-            <p className="text-sm text-slate-500">Your last {items.length} reviewed or saved snippets</p>
+            <p className="text-sm text-slate-500">
+              {loading ? 'Loading…' : `Your last ${items.length} server-side reviews`}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -60,8 +127,8 @@ export default function HistoryPage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
             <button
-              onClick={onClear}
-              disabled={!items.length}
+              // onClick={onClear}
+              disabled={!items.length || loading}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800 disabled:opacity-50"
             >
               <Trash2 className="h-4 w-4" />
@@ -78,7 +145,7 @@ export default function HistoryPage() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search in code…"
+                placeholder="Search in summary or code…"
                 className="w-full rounded-lg border pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-900 dark:border-slate-700"
               />
             </label>
@@ -108,9 +175,17 @@ export default function HistoryPage() {
         </div>
 
         {/* List */}
-        {filtered.length === 0 ? (
+        {loading ? (
           <div className="rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-800 p-6 text-center text-sm text-slate-500">
-            No history yet. Run a review from the <Link className="text-blue-600 hover:underline" href="/review">Review</Link> page.
+            Loading…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-800 p-6 text-center text-sm text-slate-500">
+            No history yet. Run a review from the{' '}
+            <Link className="text-blue-600 hover:underline" href="/review">
+              Review
+            </Link>{' '}
+            page.
           </div>
         ) : (
           <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -121,24 +196,32 @@ export default function HistoryPage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs rounded-md border px-2 py-0.5 bg-slate-50 dark:bg-slate-800 dark:border-slate-700">
-                    {item.language}
+                    {item.language || 'unknown'}
                   </span>
                   <span className="text-xs text-slate-500 tabular-nums">
                     {new Date(item.createdAt).toLocaleString()}
                   </span>
                 </div>
 
-                <pre className="mt-2 text-xs bg-slate-50 dark:bg-slate-950/40 rounded-lg p-2 overflow-hidden max-h-40 whitespace-pre-wrap">
-                  {item.code.slice(0, 600)}
-                  {item.code.length > 600 ? '…' : ''}
-                </pre>
+                {/* Prefer summary if code isn't included in history payload */}
+                {item.code ? (
+                  <pre className="mt-2 text-xs bg-slate-50 dark:bg-slate-950/40 rounded-lg p-2 overflow-hidden max-h-40 whitespace-pre-wrap">
+                    {item.code.slice(0, 600)}
+                    {item.code && item.code.length > 600 ? '…' : ''}
+                  </pre>
+                ) : (
+                  <p className="mt-2 text-xs text-slate-700 dark:text-slate-300 line-clamp-6">
+                    {item.summary || '—'}
+                  </p>
+                )}
 
                 <div className="mt-3 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => onCopy(item.code)}
+                      // onClick={() => onCopy(item)}
                       className="text-xs rounded-lg border px-2.5 py-1 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800"
                       title="Copy code"
+                      disabled={!item.code}
                     >
                       <Copy className="h-3.5 w-3.5 inline-block mr-1" />
                       Copy
@@ -146,7 +229,7 @@ export default function HistoryPage() {
 
                     <Link
                       href="/review"
-                      onClick={() => onLoadToReview(item)}
+                      // onClick={() => onLoadToReview(item)}
                       className="text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1"
                       title="Open in Review"
                     >
@@ -155,7 +238,7 @@ export default function HistoryPage() {
                   </div>
 
                   <button
-                    onClick={() => onRemove(item.id)}
+                    // onClick={() => onRemove(item.id)}
                     className="text-xs rounded-lg border px-2.5 py-1 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800"
                     title="Delete"
                   >
