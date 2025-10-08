@@ -1,6 +1,17 @@
+import { createApp } from './app';
 import { env } from './config/env';
 import { connectDB } from './config/db';
-import app from './app';
 
-await connectDB();
-app.listen(env.PORT, () => console.log(`CodePal API on :${env.PORT}`));
+async function main() {
+  await connectDB();
+  const app = createApp();
+  app.listen(env.PORT, () => {
+    console.log(`[server] listening on :${env.PORT}`);
+    console.log(`[llm] provider=${env.LLM_PROVIDER} model=${env.LLM_MODEL}`);
+  });
+}
+
+main().catch((err) => {
+  console.error('[boot] fatal:', err);
+  process.exit(1);
+});

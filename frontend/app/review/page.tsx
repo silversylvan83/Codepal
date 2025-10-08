@@ -43,6 +43,73 @@ func Hello(w http.ResponseWriter, r *http.Request) {
 
 const GOALS = ['readability', 'safety', 'performance', 'style'] as const
 
+// --- Gemini markdown parser ---
+function parseGeminiReview(
+  review: string,
+  originalCode: string,
+  lang?: string
+): { summary: string; comments: Comment[]; patch: string } {
+  const text = review || ''
+  const lines = text.split(/\r?\n/)
+
+  // Summary = everything before first "###" or "---"
+  let summary = ''
+  {
+    const stopIdx = lines.findIndex((l) => /^###\s|^---\s*$/.test(l))
+    const head = lines
+      .slice(0, stopIdx === -1 ? lines.length : stopIdx)
+      .join('\n')
+      .trim()
+    summary = head.replace(/^\s*`{3}.*?`{3}\s*$/gs, '').trim()
+  }
+
+  const comments: Comment[] = []
+  const levelMap: Record<string, string> = {
+    bugs: 'bug',
+    fixes: 'bug',
+    performance: 'performance',
+    memory: 'performance',
+    readability: 'readability',
+    'best-practice': 'readability',
+    security: 'security',
+  }
+
+  function collectBullets(sectionName: string, levelHint: string) {
+    const hIdx = lines.findIndex((l) =>
+      new RegExp(`^####\\s*\\d?\\.?\\s*${sectionName}\\b`, 'i').test(l)
+    )
+    if (hIdx === -1) return
+
+    let i = hIdx + 1
+    while (i < lines.length && !/^###\s|^####\s/.test(lines[i])) {
+      const m = lines[i].match(/^\s*[-*]\s+(.*)$/)
+      if (m) {
+        const msg = m[1].trim()
+        const lower = msg.toLowerCase()
+        let level = levelHint
+        for (const k of Object.keys(levelMap)) {
+          if (lower.includes(k)) {
+            level = levelMap[k]
+            break
+          }
+        }
+        comments.push({ line: 0, level, message: msg })
+      }
+      i++
+    }
+  }
+
+  collectBullets('Bugs and Fixes', 'bug')
+  collectBullets('Performance', 'performance')
+  collectBullets('Readability', 'readability')
+  collectBullets('Best-Practice', 'readability')
+  collectBullets('Security', 'security')
+  collectBullets('Security Issues', 'security')
+
+  return { summary, comments, patch: '' }
+}
+
+// --- Main Page ---
 export default function ReviewPage() {
   const [code, setCode] = useState(SAMPLES['JS add()'].code)
   const [lang, setLang] = useState(SAMPLES['JS add()'].lang)
@@ -56,18 +123,32 @@ export default function ReviewPage() {
   const disabled = loading || !code.trim()
 
   function toggleGoal(g: string) {
-    setGoals((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]))
+    setGoals((prev) =>
+      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]
+    )
   }
 
   async function run() {
     try {
       setLoading(true)
-      const out = await reviewCode({ code, language: lang })
-      setSummary(out.summary || '')
-      setComments(out.comments || [])
-      setPatch(out.patch || '')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e:any) {
+      const out: any = await reviewCode({ code, language: lang })
+
+      const reviewText: string =
+        (typeof out?.review === 'string' && out.review) ||
+        (typeof out?.summary === 'string' && out.summary) ||
+        ''
+
+      if (reviewText) {
+        const parsed = parseGeminiReview(reviewText, code, lang)
+        setSummary(parsed.summary)
+        setComments(parsed.comments)
+        setPatch(parsed.patch)
+      } else {
+        setSummary('')
+        setComments([])
+        setPatch('')
+      }
+    } catch (e: any) {
       alert(e?.message || 'Failed to review')
     } finally {
       setLoading(false)
@@ -124,7 +205,6 @@ export default function ReviewPage() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold">Review settings</span>
-              {/* Language */}
               <select
                 value={lang}
                 onChange={(e) => setLang(e.target.value)}
@@ -172,28 +252,32 @@ export default function ReviewPage() {
                 className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-sm bg-white hover:bg-slate-50 disabled:opacity-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800"
                 title="Clear"
               >
-                {/* <Broom className="h-4 w-4" /> */}
                 Clear
               </button>
               <button
                 onClick={run}
                 disabled={disabled}
                 className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-white ${
-                  disabled ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                  disabled
+                    ? 'bg-blue-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
                 }`}
                 title="Run review"
               >
-                {loading ? <Sparkles className="h-4 w-4 animate-pulse" /> : <Play className="h-4 w-4" />}
+                {loading ? (
+                  <Sparkles className="h-4 w-4 animate-pulse" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
                 {loading ? 'Reviewing…' : 'Review Code'}
               </button>
             </div>
           </div>
 
-          {/* Mobile goals row */}
           <div className="mt-2 flex md:hidden flex-wrap gap-1">{goalBadges}</div>
         </div>
 
-        {/* Editor card */}
+        {/* Editor */}
         <div className="rounded-2xl border bg-white dark:bg-slate-900 dark:border-slate-800 p-3">
           <label className="block text-sm font-medium mb-1">Code</label>
           <textarea
@@ -203,7 +287,12 @@ export default function ReviewPage() {
             placeholder="Paste your code here…"
           />
           <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
-            <span>Language: <span className="font-medium text-slate-700 dark:text-slate-300">{lang}</span></span>
+            <span>
+              Language:{' '}
+              <span className="font-medium text-slate-700 dark:text-slate-300">
+                {lang}
+              </span>
+            </span>
             <span className="tabular-nums">{charCount.toLocaleString()} chars</span>
           </div>
         </div>
@@ -224,7 +313,6 @@ export default function ReviewPage() {
 function applyUnified(original: string, patch: string) {
   try {
     if (!patch.trim()) return original
-    // in real app, use a robust library (e.g., 'diff') to apply unified patches
     return original
   } catch {
     return original

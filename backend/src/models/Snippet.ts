@@ -1,19 +1,14 @@
-import { Schema, model, Types } from 'mongoose';
+import mongoose from 'mongoose';
 
-const SnippetSchema = new Schema({
-  ownerId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
-  language: { type: String, index: true },
-  title: String,
-  content: String,
-  createdAt: { type: Date, default: Date.now }
-});
+const SnippetSchema = new mongoose.Schema(
+  {
+    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    language: { type: String },
+    code: { type: String, required: true },
+    title: { type: String },
+  },
+  { timestamps: true }
+);
 
-export type SnippetDoc = {
-  _id: Types.ObjectId;
-  ownerId?: Types.ObjectId;
-  language?: string;
-  title?: string;
-  content: string;
-};
-
-export default model('Snippet', SnippetSchema);
+export type ISnippet = mongoose.InferSchemaType<typeof SnippetSchema>;
+export const Snippet = mongoose.model('Snippet', SnippetSchema);

@@ -1,27 +1,32 @@
 import { Router } from 'express';
-import { z } from 'zod';
-import Snippet from '../models/Snippet';
+import { Snippet } from '../models/Snippet';
 
 const router = Router();
 
-router.post('/', async (req, res, next) => {
+// Create
+router.post('/', async (req, res) => {
   try {
-    const data = z.object({
-      title: z.string().optional(),
-      language: z.string().optional(),
-      content: z.string().min(1).max(200_000)
-    }).parse(req.body);
-
-    const doc = await Snippet.create(data);
+    const { code, language, title } = req.body || {};
+    if (!code) return res.status(400).json({ error: 'code is required' });
+    const doc = await Snippet.create({ code, language, title });
     res.json(doc);
-  } catch (e) { next(e); }
+  } catch (e) {
+    console.error('[snippets:create]', e);
+    res.status(500).json({ error: 'failed to create snippet' });
+  }
 });
 
-router.get('/', async (_req, res, next) => {
-  try {
-    const list = await Snippet.find().sort({ createdAt: -1 }).limit(50).lean();
-    res.json(list);
-  } catch (e) { next(e); }
+// List
+router.get('/', async (_req, res) => {
+  const list = await Snippet.find().sort({ createdAt: -1 }).limit(50);
+  res.json(list);
+});
+
+// Read
+router.get('/:id', async (req, res) => {
+  const doc = await Snippet.findById(req.params.id);
+  if (!doc) return res.status(404).json({ error: 'not found' });
+  res.json(doc);
 });
 
 export default router;

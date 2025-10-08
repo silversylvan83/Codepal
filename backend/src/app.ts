@@ -1,29 +1,42 @@
 import express from 'express';
 import cors from 'cors';
-import rateLimit from 'express-rate-limit';
-import { env } from './config/env.js';
-import reviews from './routes/reviews.js';
-import snippets from './routes/snippets.js';
+import { env } from './config/env';
+import reviewsRouter from './routes/reviews';
+import snippetsRouter from './routes/snippets';
 
-const app = express();
+export function createApp() {
+  const app = express();
 
-const origins = new Set(env.CORS_ORIGINS);
-app.use(cors({
-  origin(origin, cb) { if (!origin || origins.has(origin)) return cb(null, true); return cb(null, false); },
-  credentials: true
-}));
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true }));
 
-app.use(express.json({ limit: '1mb' }));
+  const whitelist = new Set(env.CORS_ORIGINS);
+  app.use(cors({
+    origin(origin:any, cb:any) {
+      if (!origin || whitelist.has(origin)) return cb(null, true);
+      cb(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  }));
 
-app.get('/', (_req, res) => res.json({ ok: true, name: 'CodePal API' }));
+  app.get('/', (_req, res) => {
+    res.json({
+      service: 'backend',
+      provider: env.LLM_PROVIDER,
+      model: env.LLM_MODEL,
+      time: new Date().toISOString(),
+    });
+  });
 
-app.use('/api/reviews', rateLimit({ windowMs: 60_000, max: 30 }), reviews);
-app.use('/api/snippets', snippets);
+  app.use('/api/reviews', reviewsRouter);
+  app.use('/api/snippets', snippetsRouter);
 
-app.use((req, res) => res.status(404).json({ error: 'Not found' }));
-app.use((err: any, _req: any, res: any, _next: any) => {
-  console.error(err);
-  res.status(500).json({ error: err.message || 'Internal error' });
-});
+  // final error handler
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: any, _req: any, res: any, _next: any) => {
+    console.error('[error]', err?.message || err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  });
 
-export default app;
+  return app;
+}

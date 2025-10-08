@@ -1,17 +1,13 @@
-import { Schema, model, Types } from 'mongoose';
+import mongoose from 'mongoose';
 
-const UserSchema = new Schema({
-  email: { type: String, unique: true, index: true },
-  name: String,
-  passwordHash: String,
-  createdAt: { type: Date, default: Date.now }
-});
+const UserSchema = new mongoose.Schema(
+  {
+    email: { type: String, required: true, unique: true, index: true },
+    name: { type: String },
+    // hash, roles, etc.
+  },
+  { timestamps: true }
+);
 
-export type UserDoc = {
-  _id: Types.ObjectId;
-  email: string;
-  name?: string;
-  passwordHash?: string;
-};
-
-export default model('User', UserSchema);
+export type IUser = mongoose.InferSchemaType<typeof UserSchema>;
+export const User = mongoose.model('User', UserSchema);

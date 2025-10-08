@@ -1,41 +1,35 @@
-import { Router } from 'express';
-import { z } from 'zod';
-import Review from '../models/Review';
-import { reviewCodeLLM } from '../llm';
-
+import { Router } from "express";
+import { reviewCodeLLM } from "../llm";
+import { Review } from "../models/Review";
+import { env } from "../config/env";
 const router = Router();
-
-const ReviewIn = z.object({
-  code: z.string().min(1).max(100_000),
-  language: z.string().optional()
-});
-
-router.post('/', async (req, res, next) => {
-  try {
-    const { code, language } = ReviewIn.parse(req.body);
-    const out = await reviewCodeLLM({ code, language });
-    const doc = await Review.create({
-      language,
-      model: process.env.LLM_PROVIDER || 'mock',
-      ...out
-    });
-    res.json(doc);
-  } catch (e) { next(e); }
-});
-
-router.get('/', async (_req, res, next) => {
-  try {
-    const list = await Review.find().sort({ createdAt: -1 }).limit(20).lean();
-    res.json(list);
-  } catch (e) { next(e); }
-});
-
-router.get('/:id', async (req, res, next) => {
-  try {
-    const doc = await Review.findById(req.params.id).lean();
-    if (!doc) return res.status(404).json({ error: 'Not found' });
-    res.json(doc);
-  } catch (e) { next(e); }
-});
-
+/** POST /api/reviews * body: { code: string; language?: string; save?: boolean; snippetId?: string } */ router.post(
+  "/",
+  async (req, res) => {
+    try {
+      const { code, language, save, snippetId } = req.body || {};
+      if (typeof code !== "string" || !code.trim()) {
+        return res
+          .status(400)
+          .json({ error: 'Missing "code" in request body' });
+      }
+      const review = await reviewCodeLLM({ code, language });
+      if (save) {
+        const doc = await Review.create({
+          snippetId: snippetId || undefined,
+          language,
+          code,
+          review,
+          provider: env.LLM_PROVIDER,
+          model: env.LLM_MODEL,
+        });
+        return res.json({ review, id: doc._id });
+      }
+      res.json({ review });
+    } catch (err: any) {
+      console.error("[reviews] error:", err);
+      res.status(500).json({ error: "Failed to review code" });
+    }
+  }
+);
 export default router;
