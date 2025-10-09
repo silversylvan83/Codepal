@@ -3,7 +3,6 @@ import cors from "cors";
 import { env } from "./config/env";
 import reviewsRouter from "./routes/reviews";
 import snippetsRouter from "./routes/snippets";
-import debugRouter from "./routes/debug";
 import historyRouter from "./routes/history";
 export function createApp() {
   const app = express();
@@ -33,7 +32,6 @@ export function createApp() {
 
   app.use("/api/reviews", reviewsRouter);
   app.use("/api/snippets", snippetsRouter);
-  app.use("/api/debug", debugRouter);
   app.use("/api/history", historyRouter);
 
   app.use("/api/history", (req, res, next) => {

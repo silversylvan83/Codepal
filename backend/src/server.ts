@@ -1,10 +1,9 @@
-// src/server.ts
 import { createApp } from './app';
 import { env } from './config/env';
 import { connectDB } from './config/db';
 
 async function main() {
-  await connectDB(); // <-- connect first
+  await connectDB(); 
   const app = createApp();
   app.listen(env.PORT, () => {
     console.log(`[server] listening on :${env.PORT}`);

@@ -1,8 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 import { useMemo, useState } from 'react'
 
-type Comment = { line: number; level: 'info' | 'warn' | 'error' | string; message: string }
+type Level = 'info' | 'warn' | 'error'
+type Comment = { line: number; level: Level | string; message: string }
+
+function isLevel(v: string): v is Level {
+  return v === 'info' || v === 'warn' || v === 'error'
+}
 
 export default function ReviewPanel({
   summary,
@@ -11,24 +15,23 @@ export default function ReviewPanel({
   summary?: string
   comments?: Comment[]
 }) {
-  const [filter, setFilter] = useState<'all' | 'info' | 'warn' | 'error'>('all')
+  const [filter, setFilter] = useState<'all' | Level>('all')
 
   const counts = useMemo(() => {
-    const base = { info: 0, warn: 0, error: 0 }
+    const base: Record<Level, number> = { info: 0, warn: 0, error: 0 }
     for (const c of comments) {
-      if (c.level === 'warn') base.warn++
-      else if (c.level === 'error') base.error++
-      else base.info++
+      const lvl: Level = isLevel(String(c.level)) ? (c.level as Level) : 'info'
+      base[lvl] += 1
     }
     return base
   }, [comments])
 
   const filtered = useMemo(() => {
     if (filter === 'all') return comments
-    return comments.filter((c) => (c.level as any) === filter)
+    return comments.filter((c) => isLevel(String(c.level)) && c.level === filter)
   }, [comments, filter])
 
-  const pill = (kind: 'info' | 'warn' | 'error') =>
+  const pill = (kind: Level) =>
     `inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
       kind === 'error'
         ? 'bg-rose-100 text-rose-700'
@@ -55,25 +58,33 @@ export default function ReviewPanel({
           <h3 className="font-semibold">Comments</h3>
           <div className="flex items-center gap-2 text-xs">
             <button
-              className={`rounded-lg border px-2.5 py-1 ${filter === 'all' ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white dark:bg-slate-900'} dark:border-slate-700`}
+              className={`rounded-lg border px-2.5 py-1 ${
+                filter === 'all' ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white dark:bg-slate-900'
+              } dark:border-slate-700`}
               onClick={() => setFilter('all')}
             >
               All ({comments.length})
             </button>
             <button
-              className={`rounded-lg border px-2.5 py-1 ${filter === 'info' ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white dark:bg-slate-900'} dark:border-slate-700`}
+              className={`rounded-lg border px-2.5 py-1 ${
+                filter === 'info' ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white dark:bg-slate-900'
+              } dark:border-slate-700`}
               onClick={() => setFilter('info')}
             >
               Info <span className="ml-1">{counts.info}</span>
             </button>
             <button
-              className={`rounded-lg border px-2.5 py-1 ${filter === 'warn' ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white dark:bg-slate-900'} dark:border-slate-700`}
+              className={`rounded-lg border px-2.5 py-1 ${
+                filter === 'warn' ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white dark:bg-slate-900'
+              } dark:border-slate-700`}
               onClick={() => setFilter('warn')}
             >
               Warn <span className="ml-1">{counts.warn}</span>
             </button>
             <button
-              className={`rounded-lg border px-2.5 py-1 ${filter === 'error' ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white dark:bg-slate-900'} dark:border-slate-700`}
+              className={`rounded-lg border px-2.5 py-1 ${
+                filter === 'error' ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white dark:bg-slate-900'
+              } dark:border-slate-700`}
               onClick={() => setFilter('error')}
             >
               Error <span className="ml-1">{counts.error}</span>
@@ -87,12 +98,15 @@ export default function ReviewPanel({
           </div>
         ) : (
           <ul className="mt-2 space-y-2">
-            {filtered.map((c, i) => (
-              <li key={i} className="text-sm leading-5">
-                <span className={pill((c.level as any) || 'info')}>L{c.line}</span>
-                <span className="ml-2">{c.message}</span>
-              </li>
-            ))}
+            {filtered.map((c, i) => {
+              const lvl: Level = isLevel(String(c.level)) ? (c.level as Level) : 'info'
+              return (
+                <li key={i} className="text-sm leading-5">
+                  <span className={pill(lvl)}>L{c.line}</span>
+                  <span className="ml-2">{c.message}</span>
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>

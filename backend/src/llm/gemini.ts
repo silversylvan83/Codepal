@@ -40,8 +40,15 @@ ${code}
 
   try {
     const res = await gemini.generateContent(prompt);
-    const text = res.response.text?.() || res.response.text || "";
-    return text.trim() || "Gemini did not return a review.";
+
+    // response.text is a function: text(): string
+    const text =
+      typeof res.response.text === "function"
+        ? res.response.text()
+        : String((res as any)?.response?.text ?? "");
+
+    const out = text?.trim();
+    return out && out.length > 0 ? out : "Gemini did not return a review.";
   } catch (err: any) {
     console.error("[Gemini error]", err?.status, err?.statusText, err?.message);
     throw err;

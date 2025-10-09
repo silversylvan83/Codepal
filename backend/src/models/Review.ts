@@ -15,7 +15,7 @@ const ReviewSchema = new mongoose.Schema(
     snippetId: { type: String },
     language: { type: String },
     code: { type: String, required: true },
-    review: { type: String, required: true }, // raw markdown/string
+    review: { type: String, required: true }, 
     summary: { type: String },
     comments: { type: [CommentSchema], default: [] },
     improvedSnippet: { type: String },

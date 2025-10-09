@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Copy, WrapText, Type, SunMedium, Moon, Sparkles } from 'lucide-react';
 import { reviewCode } from '@/lib/api';
+import type { editor as MonacoEditorNS } from 'monaco-editor';
 
 const Editor = dynamic(
   () => import('@monaco-editor/react').then((m) => m.default),
@@ -15,11 +16,28 @@ const Editor = dynamic(
   }
 );
 
-// optional: if your backend sometimes wraps the code in ``` fences
+// Backend response shape (only what we read here)
+type ReviewResponse = {
+  improvedSnippet?: string;
+  review?: string;
+  summary?: string;
+  comments?: unknown;
+  patch?: string;
+};
+
 function stripCodeFence(s: string) {
   if (!s) return '';
   const m = s.match(/```[a-zA-Z0-9_-]*\s*([\s\S]*?)\s*```/);
   return m ? m[1].trim() : s.trim();
+}
+
+function errorMessage(e: unknown): string {
+  if (typeof e === 'string') return e;
+  if (e && typeof e === 'object' && 'message' in e) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return String((e as any).message ?? 'Unknown error');
+  }
+  return 'Unknown error';
 }
 
 export default function CodeDiff({
@@ -50,7 +68,7 @@ export default function CodeDiff({
     setTheme(isDark ? 'vs-dark' : 'light');
   }, []);
 
-  const options = useMemo(
+  const options: MonacoEditorNS.IStandaloneEditorConstructionOptions = useMemo(
     () => ({
       readOnly: true,
       minimap: { enabled: false },
@@ -74,16 +92,15 @@ export default function CodeDiff({
   async function runReview() {
     try {
       setLoading(true);
-      const resp: any = await reviewCode({ code: original, language });
+      const resp: ReviewResponse = await reviewCode({ code: original, language });
       const improved = stripCodeFence(resp?.improvedSnippet || '');
       if (improved) {
         setEditorContent(improved);
       } else {
         console.warn('Review completed but improvedSnippet was empty.');
       }
-    } catch (e: any) {
-      console.error('Review failed:', e?.message || e);
-      // optional: alert(e?.message || 'Failed to review');
+    } catch (e: unknown) {
+      console.error('Review failed:', errorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -94,7 +111,6 @@ export default function CodeDiff({
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-2 border-b dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70">
         <div className="flex items-center gap-2 text-xs">
-          {/* Run review icon */}
           <button
             onClick={runReview}
             disabled={loading || !original?.trim()}
@@ -121,7 +137,9 @@ export default function CodeDiff({
               min={11}
               max={18}
               value={fontSize}
-              onChange={(e) => setFontSize(parseInt(e.target.value))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setFontSize(Number(e.target.value))
+              }
               className="h-1 w-24"
               aria-label="Font size"
             />
@@ -151,12 +169,7 @@ export default function CodeDiff({
 
       {/* Editor */}
       <div className="h-[55vh]">
-        <Editor
-          value={editorContent}
-          language={language}
-          theme={theme}
-          options={options as any}
-        />
+        <Editor value={editorContent} language={language} theme={theme} options={options} />
       </div>
     </div>
   );

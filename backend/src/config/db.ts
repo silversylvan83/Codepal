@@ -1,9 +1,5 @@
-// src/config/db.ts
 import mongoose from 'mongoose';
 import { env } from './env';
-
-mongoose.set('strictQuery', true);
-mongoose.set('debug', true); // 👈 logs every Mongo query
 
 export async function connectDB() {
   try {

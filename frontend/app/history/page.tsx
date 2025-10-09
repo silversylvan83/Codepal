@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { Copy, Trash2, ArrowRight, Search, ChevronDown } from 'lucide-react'
 import { getReviewHistory } from '@/lib/api'
 
-
 const LANGS = ['all', 'javascript', 'typescript', 'python', 'java', 'go', 'csharp'] as const
 
 export type HistoryItem = {
@@ -24,15 +23,13 @@ export default function HistoryPage() {
   const [q, setQ] = useState('')
   const [lang, setLang] = useState<(typeof LANGS)[number]>('all')
 
-  // fetch from backend history endpoint
+  // Fetch from backend history endpoint
   useEffect(() => {
     let mounted = true
     ;(async () => {
       try {
         setLoading(true)
         const data = await getReviewHistory({ limit: 50 })
-        // Shape expected from backend:
-        // { total, count, items: [{ id, language, summary, createdAt, model, provider, (optional) code }] }
         if (mounted) setItems(Array.isArray(data?.items) ? data.items : [])
       } catch (e) {
         console.error('Failed to load history:', e)
@@ -60,76 +57,38 @@ export default function HistoryPage() {
     return data
   }, [items, q, lang])
 
-  // async function onClear() {
-  //   try {
-  //     await clearReviews() // DELETE /api/reviews
-  //     setItems([])
-  //   } catch (e) {
-  //     console.error('Failed to clear history:', e)
-  //     // optional: toast error
-  //   }
-  // }
-
-  // async function onCopy(item: HistoryItem) {
-  //   try {
-  //     // prefer code if the endpoint provides it; else fetch the full doc
-  //     let code = item.code
-  //     if (!code) {
-  //       const full = await getReviewById(item.id) // GET /api/reviews/:id
-  //       code = full?.code || ''
-  //     }
-  //     if (!code) return
-  //     await navigator.clipboard.writeText(code)
-  //     // optional: toast success
-  //   } catch (e) {
-  //     console.error('Copy failed:', e)
-  //   }
-  // }
-
-  // async function onRemove(id: string) {
-  //   try {
-  //     await deleteReview(id) // DELETE /api/reviews/:id
-  //     setItems((prev) => prev.filter((x) => x.id !== id))
-  //   } catch (e) {
-  //     console.error('Failed to delete review:', e)
-  //   }
-  // }
-
-  // async function onLoadToReview(item: HistoryItem) {
-  //   try {
-  //     // fetch full record to ensure we have code + language
-  //     const full = await getReviewById(item.id) // GET /api/reviews/:id
-  //     const code = full?.code || item.code || ''
-  //     const language = full?.language || item.language || 'javascript'
-  //     if (!code) return
-  //     localStorage.setItem('codepal:last', JSON.stringify({ code, language }))
-  //   } catch (e) {
-  //     console.error('Failed to load detail:', e)
-  //   }
-  // }
-
   return (
-    <main className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-      <div className="max-w-7xl mx-auto p-4 space-y-4">
-        <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div className="relative min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 text-slate-900 dark:text-slate-100">
+      {/* subtle background glow */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-24 -left-16 h-72 w-72 rounded-full bg-blue-500/15 blur-3xl dark:bg-blue-600/10" />
+        <div className="absolute top-40 right-0 h-80 w-80 rounded-full bg-indigo-400/10 blur-3xl dark:bg-indigo-600/10" />
+      </div>
+
+      <main className="max-w-7xl mx-auto p-4 space-y-6">
+        {/* Title */}
+        <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pt-2">
           <div>
-            <h1 className="text-xl font-semibold">History</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+              Review history
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               {loading ? 'Loading…' : `Your last ${items.length} server-side reviews`}
             </p>
           </div>
+
           <div className="flex items-center gap-2">
             <Link
               href="/review"
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 text-white px-3 py-2 text-sm hover:bg-blue-700"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:via-indigo-700 hover:to-blue-800 text-white px-3 py-2 text-sm shadow-sm transition"
             >
               Go to Review
               <ArrowRight className="h-4 w-4" />
             </Link>
             <button
-              // onClick={onClear}
               disabled={!items.length || loading}
-              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm bg-white/80 hover:bg-white dark:bg-slate-900/80 dark:border-slate-700 dark:hover:bg-slate-800 disabled:opacity-50"
+              title="Clear all"
             >
               <Trash2 className="h-4 w-4" />
               Clear all
@@ -137,8 +96,8 @@ export default function HistoryPage() {
           </div>
         </header>
 
-        {/* Controls */}
-        <div className="rounded-xl border bg-white/80 dark:bg-slate-900/80 dark:border-slate-800 backdrop-blur p-3">
+        {/* Filters */}
+        <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur p-3 shadow-sm">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <label className="relative w-full md:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -146,18 +105,18 @@ export default function HistoryPage() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search in summary or code…"
-                className="w-full rounded-lg border pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-900 dark:border-slate-700"
+                className="w-full rounded-lg border pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-900 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               />
             </label>
 
             <div className="flex items-center gap-2">
               <div className="relative">
                 <details className="group">
-                  <summary className="list-none inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-900 dark:border-slate-700 cursor-pointer">
+                  <summary className="list-none inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-900 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
                     Language: <span className="font-medium">{lang}</span>
                     <ChevronDown className="h-4 w-4 opacity-70 group-open:rotate-180 transition" />
                   </summary>
-                  <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border bg-white dark:bg-slate-900 dark:border-slate-700 shadow">
+                  <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-700 shadow-lg overflow-hidden">
                     {LANGS.map((l) => (
                       <button
                         key={l}
@@ -172,17 +131,29 @@ export default function HistoryPage() {
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
         {/* List */}
         {loading ? (
-          <div className="rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-800 p-6 text-center text-sm text-slate-500">
-            Loading…
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur p-3 animate-pulse"
+              >
+                <div className="flex justify-between">
+                  <div className="h-5 w-16 rounded bg-slate-200/70 dark:bg-slate-800/80" />
+                  <div className="h-4 w-24 rounded bg-slate-200/70 dark:bg-slate-800/80" />
+                </div>
+                <div className="mt-3 h-28 rounded bg-slate-200/70 dark:bg-slate-800/80" />
+                <div className="mt-3 h-8 rounded bg-slate-200/70 dark:bg-slate-800/80" />
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-800 p-6 text-center text-sm text-slate-500">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur p-6 text-center text-sm text-slate-600 dark:text-slate-400">
             No history yet. Run a review from the{' '}
-            <Link className="text-blue-600 hover:underline" href="/review">
+            <Link className="text-blue-600 hover:underline dark:text-blue-400" href="/review">
               Review
             </Link>{' '}
             page.
@@ -192,20 +163,31 @@ export default function HistoryPage() {
             {filtered.map((item) => (
               <li
                 key={item.id}
-                className="group rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-800 p-3 flex flex-col"
+                className="group rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur p-3 flex flex-col shadow-sm hover:shadow-md transition-shadow"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs rounded-md border px-2 py-0.5 bg-slate-50 dark:bg-slate-800 dark:border-slate-700">
-                    {item.language || 'unknown'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase tracking-wide rounded-md border px-2 py-0.5 bg-slate-50 dark:bg-slate-800 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                      {item.language || 'unknown'}
+                    </span>
+                    {item.provider && (
+                      <span className="text-[10px] rounded-md px-2 py-0.5 bg-blue-600/10 text-blue-700 dark:text-blue-300">
+                        {item.provider}
+                      </span>
+                    )}
+                    {item.model && (
+                      <span className="text-[10px] rounded-md px-2 py-0.5 bg-indigo-600/10 text-indigo-700 dark:text-indigo-300">
+                        {item.model}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs text-slate-500 tabular-nums">
                     {new Date(item.createdAt).toLocaleString()}
                   </span>
                 </div>
 
-                {/* Prefer summary if code isn't included in history payload */}
                 {item.code ? (
-                  <pre className="mt-2 text-xs bg-slate-50 dark:bg-slate-950/40 rounded-lg p-2 overflow-hidden max-h-40 whitespace-pre-wrap">
+                  <pre className="mt-2 text-xs bg-slate-50 dark:bg-slate-950/40 rounded-xl p-2 overflow-hidden max-h-40 whitespace-pre-wrap border border-slate-200/70 dark:border-slate-800/70">
                     {item.code.slice(0, 600)}
                     {item.code && item.code.length > 600 ? '…' : ''}
                   </pre>
@@ -218,8 +200,7 @@ export default function HistoryPage() {
                 <div className="mt-3 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <button
-                      // onClick={() => onCopy(item)}
-                      className="text-xs rounded-lg border px-2.5 py-1 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800"
+                      className="text-xs rounded-lg border px-2.5 py-1 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800 disabled:opacity-50"
                       title="Copy code"
                       disabled={!item.code}
                     >
@@ -229,8 +210,7 @@ export default function HistoryPage() {
 
                     <Link
                       href="/review"
-                      // onClick={() => onLoadToReview(item)}
-                      className="text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1"
+                      className="text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 shadow-sm"
                       title="Open in Review"
                     >
                       Open in Review
@@ -238,7 +218,6 @@ export default function HistoryPage() {
                   </div>
 
                   <button
-                    // onClick={() => onRemove(item.id)}
                     className="text-xs rounded-lg border px-2.5 py-1 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800"
                     title="Delete"
                   >
@@ -249,7 +228,7 @@ export default function HistoryPage() {
             ))}
           </ul>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
   )
 }

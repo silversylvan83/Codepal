@@ -1,11 +1,10 @@
 import { Router } from "express";
-import mongoose from "mongoose";
 import { reviewCodeLLM } from "../llm";
 import { Review } from "../models/Review";
 import { History } from "../models/History";
 import { env } from "../config/env";
-import { parseGeminiReview } from "../utils/parseGeminiReview"; // optional, as before
-import { improveCodeLLM } from "../llm/improve"; // 👈 new
+import { parseGeminiReview } from "../utils/parseGeminiReview"; 
+import { improveCodeLLM } from "../llm/improve"; 
 
 const router = Router();
 
