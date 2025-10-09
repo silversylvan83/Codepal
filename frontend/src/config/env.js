@@ -17,10 +17,7 @@ export const env = {
     'mongodb+srv://vaishnavisanya28_db_user:YELoCWk4OlD9z5yl@cluster0.hlkduio.mongodb.net/'
   ),
 
-  // CORS
-  CORS_ORIGINS: (process.env.CORS_ORIGINS || 'http://localhost:3000')
-    .split(',')
-    .map((s) => s.trim()),
+  
 
   // LLM (Gemini-only)
   LLM_PROVIDER: (process.env.LLM_PROVIDER || 'gemini').toLowerCase(),

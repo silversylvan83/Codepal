@@ -7,6 +7,7 @@
     "dev": "next dev --turbopack",
     "api:dev": "node src/server.js",
     "build": "next build --turbopack",
+    "dev:oneport": "node dev-server.mjs",
     "start": "next start",
     "lint": "eslint"
   },
