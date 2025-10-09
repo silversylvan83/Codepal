@@ -17,11 +17,39 @@ export type HistoryItem = {
   provider?: string
 }
 
+// robust copy helper with fallback
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.top = '-9999px'
+    ta.style.left = '-9999px'
+    ta.setAttribute('readonly', 'true')
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+
 export default function HistoryPage() {
   const [items, setItems] = useState<HistoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
   const [lang, setLang] = useState<(typeof LANGS)[number]>('all')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   // Fetch from backend history endpoint
   useEffect(() => {
@@ -54,7 +82,6 @@ export default function HistoryPage() {
         const language = (x.language ?? '').toLowerCase()
         const model = (x.model ?? '').toLowerCase()
         const provider = (x.provider ?? '').toLowerCase()
-        // include createdAt string too, handy for quick date finds
         const created = (x.createdAt ? new Date(x.createdAt).toLocaleString() : '').toLowerCase()
         return (
           summary.includes(s) ||
@@ -90,13 +117,7 @@ export default function HistoryPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* <Link
-              href="/review"
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:via-indigo-700 hover:to-blue-800 text-white px-3 py-2 text-sm shadow-sm transition"
-            >
-              Go to Review
-              <ArrowRight className="h-4 w-4" />
-            </Link> */}
+            {/* <Link ...>Go to Review</Link> */}
             <button
               disabled={!items.length || loading}
               className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm bg-white/80 hover:bg-white dark:bg-slate-900/80 dark:border-slate-700 dark:hover:bg-slate-800 disabled:opacity-50"
@@ -212,16 +233,23 @@ export default function HistoryPage() {
 
                 <div className="mt-3 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
+                    {/* Copy SUMMARY (API response) */}
                     <button
                       className="text-xs rounded-lg border px-2.5 py-1 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800 disabled:opacity-50"
-                      title="Copy code"
-                      disabled={!item.code}
+                      title={item.summary ? 'Copy summary' : 'No summary to copy'}
+                      disabled={!item.summary}
                       onClick={async () => {
-                        try { await navigator.clipboard.writeText(item.code ?? '') } catch {}
+                        if (!item.summary) return
+                        const ok = await copyText(item.summary)
+                        if (ok) {
+                          setCopiedId(item.id)
+                          setTimeout(() => setCopiedId((id) => (id === item.id ? null : id)), 1200)
+                        }
                       }}
+                      aria-live="polite"
                     >
                       <Copy className="h-3.5 w-3.5 inline-block mr-1" />
-                      Copy
+                      {copiedId === item.id ? 'Copied!' : 'Copy'}
                     </button>
 
                     <Link
