@@ -30,7 +30,7 @@ export default function HistoryPage() {
       try {
         setLoading(true)
         const data = await getReviewHistory({ limit: 50 })
-        if (mounted) setItems(Array.isArray(data?.items) ? data.items : [])
+        if (mounted) setItems(Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [])
       } catch (e) {
         console.error('Failed to load history:', e)
         if (mounted) setItems([])
@@ -45,14 +45,26 @@ export default function HistoryPage() {
 
   const filtered = useMemo(() => {
     let data = items
-    if (lang !== 'all') data = data.filter((x) => x.language === lang)
-    if (q.trim()) {
-      const s = q.toLowerCase()
-      data = data.filter(
-        (x) =>
-          (x.summary && x.summary.toLowerCase().includes(s)) ||
-          (x.code && x.code.toLowerCase().includes(s))
-      )
+    if (lang !== 'all') data = data.filter((x) => (x.language ?? '').toLowerCase() === lang)
+    const s = q.trim().toLowerCase()
+    if (s) {
+      data = data.filter((x) => {
+        const summary = (x.summary ?? '').toLowerCase()
+        const code = (x.code ?? '').toLowerCase()
+        const language = (x.language ?? '').toLowerCase()
+        const model = (x.model ?? '').toLowerCase()
+        const provider = (x.provider ?? '').toLowerCase()
+        // include createdAt string too, handy for quick date finds
+        const created = (x.createdAt ? new Date(x.createdAt).toLocaleString() : '').toLowerCase()
+        return (
+          summary.includes(s) ||
+          code.includes(s) ||
+          language.includes(s) ||
+          model.includes(s) ||
+          provider.includes(s) ||
+          created.includes(s)
+        )
+      })
     }
     return data
   }, [items, q, lang])
@@ -78,13 +90,13 @@ export default function HistoryPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
+            {/* <Link
               href="/review"
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:via-indigo-700 hover:to-blue-800 text-white px-3 py-2 text-sm shadow-sm transition"
             >
               Go to Review
               <ArrowRight className="h-4 w-4" />
-            </Link>
+            </Link> */}
             <button
               disabled={!items.length || loading}
               className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm bg-white/80 hover:bg-white dark:bg-slate-900/80 dark:border-slate-700 dark:hover:bg-slate-800 disabled:opacity-50"
@@ -96,15 +108,15 @@ export default function HistoryPage() {
           </div>
         </header>
 
-        {/* Filters */}
-        <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur p-3 shadow-sm">
+        {/* Filters (sticky, on top of results) */}
+        <section className="sticky top-2 z-40 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur p-3 shadow-sm">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <label className="relative w-full md:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search in summary or code…"
+                placeholder="Search in summary, code, language, model…"
                 className="w-full rounded-lg border pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-900 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               />
             </label>
@@ -116,7 +128,8 @@ export default function HistoryPage() {
                     Language: <span className="font-medium">{lang}</span>
                     <ChevronDown className="h-4 w-4 opacity-70 group-open:rotate-180 transition" />
                   </summary>
-                  <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-700 shadow-lg overflow-hidden">
+                  {/* make sure menu overlays cards; use high z-index */}
+                  <div className="absolute right-0 z-50 mt-1 w-44 rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-700 shadow-lg overflow-hidden">
                     {LANGS.map((l) => (
                       <button
                         key={l}
@@ -203,6 +216,9 @@ export default function HistoryPage() {
                       className="text-xs rounded-lg border px-2.5 py-1 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800 disabled:opacity-50"
                       title="Copy code"
                       disabled={!item.code}
+                      onClick={async () => {
+                        try { await navigator.clipboard.writeText(item.code ?? '') } catch {}
+                      }}
                     >
                       <Copy className="h-3.5 w-3.5 inline-block mr-1" />
                       Copy
