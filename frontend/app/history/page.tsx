@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Copy, Trash2, ArrowRight, Search, ChevronDown } from 'lucide-react'
+import { Copy, Trash2, Search, ChevronDown } from 'lucide-react'
 import { getReviewHistory } from '@/lib/api'
 
 const LANGS = ['all', 'javascript', 'typescript', 'python', 'java', 'go', 'csharp'] as const

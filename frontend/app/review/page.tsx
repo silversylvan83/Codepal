@@ -58,8 +58,6 @@ func Hello(w http.ResponseWriter, r *http.Request) {
 // --- Gemini markdown parser ---
 function parseGeminiReview(
   review: string,
-  _originalCode: string,
-  _lang?: string
 ): { summary: string; comments: Comment[]; patch: string } {
   const text = review || "";
   const lines = text.split(/\r?\n/);
@@ -162,7 +160,7 @@ export default function ReviewPage() {
         "";
 
       if (reviewText) {
-        const parsed = parseGeminiReview(reviewText, code, lang);
+        const parsed = parseGeminiReview(reviewText);
         setSummary(parsed.summary);
         setComments(parsed.comments);
         setPatch(parsed.patch);

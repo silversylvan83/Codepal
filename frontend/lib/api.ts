@@ -17,6 +17,7 @@ export async function listReviews() {
   return res.json();
 }
 export async function getReviewHistory(params?: { limit?: number; skip?: number; language?: string }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const qs = new URLSearchParams(params as any).toString();
   const res = await fetch(`${API}/api/history${qs ? `?${qs}` : ''}`, {
     cache: 'no-store',

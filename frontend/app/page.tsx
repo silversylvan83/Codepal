@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import {
-  Code2,
   Sparkles,
   Wand2,
   ShieldCheck,
   Gauge,
-  GitBranch,
   ArrowRight,
   History,
   Stars,
@@ -38,7 +36,7 @@ def parse_int(x):
   useEffect(() => {
     const t = setInterval(() => setIdx((i) => (i + 1) % snippets.length), 3500);
     return () => clearInterval(t);
-  }, []);
+  }, [snippets.length]);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 text-slate-900 dark:text-slate-100">
