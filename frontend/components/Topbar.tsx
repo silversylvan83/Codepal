@@ -32,7 +32,7 @@ export default function Topbar() {
             <Code2 size={18} />
           </span>
           <span className="font-semibold tracking-tight text-slate-800 dark:text-slate-100">
-            CodePal
+            CodeLens
           </span>
         </Link>
 

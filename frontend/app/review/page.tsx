@@ -109,7 +109,6 @@ function parseGeminiReview(
   return { summary, comments, patch: '' }
 }
 
-// --- Main Page ---
 export default function ReviewPage() {
   const [code, setCode] = useState(SAMPLES['JS add()'].code)
   const [lang, setLang] = useState(SAMPLES['JS add()'].lang)

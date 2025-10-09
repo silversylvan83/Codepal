@@ -1,38 +1,57 @@
-'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import dynamic from 'next/dynamic'
-import { Copy, Columns, WrapText, Type, SunMedium, Moon } from 'lucide-react'
+'use client';
 
-const DiffEditor = dynamic(
-  () => import('@monaco-editor/react').then((m) => m.DiffEditor),
-  { ssr: false, loading: () => <div className="h-[55vh] rounded-xl border bg-white/60 dark:bg-slate-900/60" /> }
-)
+import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { Copy, WrapText, Type, SunMedium, Moon, Sparkles } from 'lucide-react';
+import { reviewCode } from '@/lib/api';
+
+const Editor = dynamic(
+  () => import('@monaco-editor/react').then((m) => m.default),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[55vh] rounded-xl border bg-white/60 dark:bg-slate-900/60" />
+    ),
+  }
+);
+
+// optional: if your backend sometimes wraps the code in ``` fences
+function stripCodeFence(s: string) {
+  if (!s) return '';
+  const m = s.match(/```[a-zA-Z0-9_-]*\s*([\s\S]*?)\s*```/);
+  return m ? m[1].trim() : s.trim();
+}
 
 export default function CodeDiff({
-  original,
-  modified,
+  original,           // used as the source we send to the API
+  modified,           // initial improved snippet (if caller already has one)
   language = 'javascript',
 }: {
-  original: string
-  modified: string
-  language?: string
+  original: string;
+  modified: string;
+  language?: string;
 }) {
-  const [sideBySide, setSideBySide] = useState(true)
-  const [wrap, setWrap] = useState<'off' | 'on'>('off')
-  const [theme, setTheme] = useState<'light' | 'vs-dark'>('light')
-  const [fontSize, setFontSize] = useState(13)
+  const [wrap, setWrap] = useState<'off' | 'on'>('off');
+  const [theme, setTheme] = useState<'light' | 'vs-dark'>('light');
+  const [fontSize, setFontSize] = useState(13);
+  const [loading, setLoading] = useState(false);
 
-  const containerRef = useRef<HTMLDivElement | null>(null)
+  // editorContent holds ONLY the improved snippet
+  const [editorContent, setEditorContent] = useState<string>(stripCodeFence(modified || ''));
+
+  // keep editorContent in sync if parent passes a new "modified"
+  useEffect(() => {
+    setEditorContent(stripCodeFence(modified || ''));
+  }, [modified]);
 
   // Sync Monaco theme with site theme (optional)
   useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark')
-    setTheme(isDark ? 'vs-dark' : 'light')
-  }, [])
+    const isDark = document.documentElement.classList.contains('dark');
+    setTheme(isDark ? 'vs-dark' : 'light');
+  }, []);
 
   const options = useMemo(
     () => ({
-      renderSideBySide: sideBySide,
       readOnly: true,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
@@ -41,14 +60,32 @@ export default function CodeDiff({
       wordWrap: wrap,
       fontSize,
     }),
-    [sideBySide, wrap, fontSize]
-  )
+    [wrap, fontSize]
+  );
 
-  async function copyModified() {
+  async function copyCode() {
     try {
-      await navigator.clipboard.writeText(modified || '')
+      await navigator.clipboard.writeText(editorContent || '');
     } catch {
       // ignore
+    }
+  }
+
+  async function runReview() {
+    try {
+      setLoading(true);
+      const resp: any = await reviewCode({ code: original, language });
+      const improved = stripCodeFence(resp?.improvedSnippet || '');
+      if (improved) {
+        setEditorContent(improved);
+      } else {
+        console.warn('Review completed but improvedSnippet was empty.');
+      }
+    } catch (e: any) {
+      console.error('Review failed:', e?.message || e);
+      // optional: alert(e?.message || 'Failed to review');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -57,14 +94,17 @@ export default function CodeDiff({
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-2 border-b dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70">
         <div className="flex items-center gap-2 text-xs">
+          {/* Run review icon */}
           <button
-            onClick={() => setSideBySide((v) => !v)}
-            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800"
-            title="Toggle side-by-side"
+            onClick={runReview}
+            disabled={loading || !original?.trim()}
+            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 bg-white hover:bg-slate-50 disabled:opacity-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800"
+            title="Generate improved snippet"
           >
-            <Columns className="h-3.5 w-3.5" />
-            {sideBySide ? 'Side-by-side' : 'Inline'}
+            <Sparkles className={`h-3.5 w-3.5 ${loading ? 'animate-pulse' : ''}`} />
+            {loading ? 'Reviewing…' : 'Improve'}
           </button>
+
           <button
             onClick={() => setWrap((w) => (w === 'off' ? 'on' : 'off'))}
             className="inline-flex items-center gap-1 rounded-md border px-2 py-1 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800"
@@ -73,6 +113,7 @@ export default function CodeDiff({
             <WrapText className="h-3.5 w-3.5" />
             {wrap === 'on' ? 'Wrap on' : 'Wrap off'}
           </button>
+
           <div className="inline-flex items-center gap-1 rounded-md border px-2 py-1 bg-white dark:bg-slate-900 dark:border-slate-700">
             <Type className="h-3.5 w-3.5" />
             <input
@@ -98,9 +139,9 @@ export default function CodeDiff({
             {theme === 'vs-dark' ? 'Light' : 'Dark'}
           </button>
           <button
-            onClick={copyModified}
+            onClick={copyCode}
             className="inline-flex items-center gap-1 rounded-md border px-2 py-1 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800"
-            title="Copy modified code"
+            title="Copy improved code"
           >
             <Copy className="h-3.5 w-3.5" />
             Copy
@@ -109,16 +150,14 @@ export default function CodeDiff({
       </div>
 
       {/* Editor */}
-      <div ref={containerRef} className="h-[55vh]">
-        <DiffEditor
-          original={original}
-          modified={modified}
+      <div className="h-[55vh]">
+        <Editor
+          value={editorContent}
           language={language}
           theme={theme}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           options={options as any}
         />
       </div>
     </div>
-  )
+  );
 }
