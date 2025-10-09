@@ -32,8 +32,7 @@ export async function improveCodeLLM({
   const genAI = new GoogleGenerativeAI(apiKey);
   const gemini = genAI.getGenerativeModel({ model: modelAlias(model) });
 
-  const prompt = `You are a senior ${language || 'software'} engineer.
-Rewrite the following code to be more robust, readable, secure, and performant.
+  const prompt = `Rewrite the following code to be more robust, readable, secure, and performant.
 Keep the same external behavior and signatures.
 Return ONLY the improved code. Do NOT include any commentary or markdown fences.
 

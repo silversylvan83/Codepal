@@ -16,7 +16,6 @@ const Editor = dynamic(
   }
 );
 
-// Backend response shape (only what we read here)
 type ReviewResponse = {
   improvedSnippet?: string;
   review?: string;
@@ -41,8 +40,8 @@ function errorMessage(e: unknown): string {
 }
 
 export default function CodeDiff({
-  original,           // used as the source we send to the API
-  modified,           // initial improved snippet (if caller already has one)
+  original,          
+  modified,          
   language = 'javascript',
 }: {
   original: string;
@@ -54,15 +53,12 @@ export default function CodeDiff({
   const [fontSize, setFontSize] = useState(13);
   const [loading, setLoading] = useState(false);
 
-  // editorContent holds ONLY the improved snippet
   const [editorContent, setEditorContent] = useState<string>(stripCodeFence(modified || ''));
 
-  // keep editorContent in sync if parent passes a new "modified"
   useEffect(() => {
     setEditorContent(stripCodeFence(modified || ''));
   }, [modified]);
 
-  // Sync Monaco theme with site theme (optional)
   useEffect(() => {
     const isDark = document.documentElement.classList.contains('dark');
     setTheme(isDark ? 'vs-dark' : 'light');

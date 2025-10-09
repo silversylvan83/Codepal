@@ -25,7 +25,7 @@ export async function reviewWithGemini({
   const genAI = new GoogleGenerativeAI(apiKey);
   const gemini = genAI.getGenerativeModel({ model: modelAlias(model) });
 
-  const prompt = `You are a senior ${language || "software"} engineer.
+  const prompt = `
 Review the following ${language || "code"} and provide:
 - Bugs and fixes
 - Performance/memory optimizations
