@@ -9,7 +9,7 @@ const must = (key, fallback) => {
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
-  PORT: Number(process.env.PORT || 4000),
+  PORT: Number(process.env.PORT ),
 
   // MongoDB connection
   MONGODB_URI: must(
@@ -20,7 +20,7 @@ export const env = {
   
 
   // LLM (Gemini-only)
-  LLM_PROVIDER: (process.env.LLM_PROVIDER || 'gemini').toLowerCase(),
+  LLM_PROVIDER: (process.env.LLM_PROVIDER ).toLowerCase(),
   GEMINI_API_KEY: must('GEMINI_API_KEY'),
-  LLM_MODEL: process.env.LLM_MODEL || 'gemini-1.5-pro',
+  LLM_MODEL: process.env.LLM_MODEL ,
 };

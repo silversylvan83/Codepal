@@ -14,7 +14,7 @@ import { env } from './src/config/env.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dev = process.env.NODE_ENV !== 'production';
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT );
 
 (async function main() {
   // 1) DB once
