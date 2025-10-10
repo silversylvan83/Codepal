@@ -1,94 +1,122 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { env } from '@/lib/server/env';
-import { connectDB } from '@/lib/server/db';
-import { reviewCodeLLM } from '@/lib/server/llm';
-import { improveCodeLLM } from '@/lib/server/llm/improve';
-import { parseGeminiReview } from '@/lib/server/utils/parseGeminiReview';
-import { ReviewModel } from '@/lib/server/models/Review';
-import { HistoryModel } from '@/lib/server/models/History';
+import { NextResponse } from "next/server";
+import { env } from "@/lib/server/env";
+import { connectDB } from "@/lib/server/db";
+import { reviewCodeLLM } from "@/lib/server/llm";
+import { improveCodeLLM } from "@/lib/server/llm/improve";
+import { parseGeminiReview } from "@/lib/server/utils/parseGeminiReview";
+import { ReviewModel } from "@/lib/server/models/Review";
+import { HistoryModel } from "@/lib/server/models/History";
 
-export const runtime = 'nodejs';
-// If you’re on Hobby, you effectively get ~10s. Keep our own timeout below that.
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 20;
 
-type ReviewLevel = 'bug' | 'performance' | 'readability' | 'security' | 'info';
+// Types to avoid `any`
+type ReviewLevel = "bug" | "performance" | "readability" | "security" | "info";
 type ReviewComment = { line: number; level: ReviewLevel; message: string };
 
-function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`${label}_timeout_${ms}ms`)), ms);
-    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
-  });
+// Narrowing helper for error objects
+function errorMessage(e: unknown): string {
+  if (typeof e === "string") return e;
+  if (
+    e &&
+    typeof e === "object" &&
+    "message" in e &&
+    typeof (e as { message: unknown }).message === "string"
+  ) {
+    return (e as { message: string }).message;
+  }
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return String(e);
+  }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const code: string | undefined = body?.code;
-    const language: string | undefined = body?.language;
-    const snippetId: string | undefined = body?.snippetId;
-    const save: boolean = body?.save !== false; // default true
+    const body = (await req.json()) as {
+      code?: string;
+      language?: string;
+      snippetId?: string;
+      save?: boolean;
+    };
 
-    if (typeof code !== 'string' || !code.trim()) {
+    const { code, language, snippetId, save = true } = body ?? {};
+    if (typeof code !== "string" || !code.trim()) {
       return NextResponse.json({ error: 'Missing "code"' }, { status: 400 });
     }
 
-    // Launch a *fast* improvement in parallel so we can fall back quickly.
-    const improveFast = improveCodeLLM({
+    // Start an improvement in parallel; fall back to original code on error.
+    const improvePromise = improveCodeLLM({
       code,
       language,
       model: env.LLM_MODEL,
       apiKey: env.GEMINI_API_KEY,
     }).catch(() => code);
 
-    // Hard-timeout the “full review” so the function never exceeds Vercel’s limit.
-    let reviewText = '';
+    // Primary review (may timeout/throw)
+    let reviewText = "";
     try {
-      reviewText = await withTimeout(
-        reviewCodeLLM({ code, language }),
-        8500, // keep below hobby 10s wall, adjust if your plan is higher
-        'review'
-      );
+      reviewText = await reviewCodeLLM({ code, language });
     } catch {
-      // Degraded path: return improved snippet only
-      const improvedSnippet = await withTimeout(improveFast, 2000, 'improve');
+      const improved = await improvePromise;
       return NextResponse.json({
-        review: 'Timed out; returning improved snippet.',
-        summary: '',
+        review: "Timed out; returning improved snippet.",
+        summary: "",
         comments: [] as ReviewComment[],
-        improvedSnippet,
+        improvedSnippet: improved,
         id: null,
         saved: false,
       });
     }
 
-    // Parse the review text (no network)
-    let summary = '';
+    // Parse the review to summary/comments/snippet (best-effort)
+    let summary = "";
     let comments: ReviewComment[] = [];
-    let improvedSnippet = '';
+    let improvedSnippet = "";
     try {
       const parsed = parseGeminiReview(reviewText);
-      summary = parsed.summary ?? '';
-      comments = Array.isArray(parsed.comments) ? parsed.comments as ReviewComment[] : [];
-      improvedSnippet = parsed.improvedSnippet ?? '';
-    } catch {
-      // ignore parse errors; we’ll still return reviewText
-    }
+      summary = parsed.summary ?? "";
 
-    // If the model didn’t include an improved snippet, use the fast one we started earlier.
-    if (!improvedSnippet) {
-      try {
-        improvedSnippet = await withTimeout(improveFast, 2000, 'improve');
-      } catch {
-        improvedSnippet = code; // absolute fallback
+      // Normalize & validate comments
+      if (Array.isArray(parsed.comments)) {
+        const allowed: ReadonlyArray<ReviewLevel> = [
+          "bug",
+          "performance",
+          "readability",
+          "security",
+          "info",
+        ];
+        comments = parsed.comments.map((c) => {
+          const line = Number((c as { line?: unknown })?.line ?? 0);
+          const levelRaw = String(
+            (c as { level?: unknown })?.level ?? "info"
+          ).toLowerCase();
+          const level = (
+            allowed.includes(levelRaw as ReviewLevel) ? levelRaw : "info"
+          ) as ReviewLevel;
+          const message = String(
+            (c as { message?: unknown })?.message ?? ""
+          ).trim();
+          return { line: Number.isFinite(line) ? line : 0, level, message };
+        });
       }
+
+      improvedSnippet = parsed.improvedSnippet ?? "";
+    } catch {
+      // ignore parse failures; we’ll still return reviewText + improved snippet
     }
 
-    // Save only if requested (and connect just-in-time to avoid cold-start costs on timeouts)
+    if (!improvedSnippet) {
+      improvedSnippet = await improvePromise;
+    }
+
+    // Optional persistence
     let reviewDocId: string | null = null;
     if (save) {
-      await connectDB(); // should be a cached singleton in your db helper
+      await connectDB();
+
       const reviewDoc = await new ReviewModel({
         snippetId: snippetId || undefined,
         language,
@@ -100,21 +128,26 @@ export async function POST(req: NextRequest) {
         provider: env.LLM_PROVIDER,
         model: env.LLM_MODEL,
       }).save();
+
       reviewDocId = reviewDoc._id.toString();
 
-      // best-effort history (don’t block the response)
-      void new HistoryModel({
-        snippetId: snippetId || undefined,
-        reviewId: reviewDocId || undefined,
-        language,
-        code,
-        review: reviewText,
-        summary,
-        comments,
-        improvedSnippet,
-        provider: env.LLM_PROVIDER,
-        model: env.LLM_MODEL,
-      }).save().catch(() => {});
+      // best-effort history save (don't block user response if it fails)
+      try {
+        await new HistoryModel({
+          snippetId: snippetId || undefined,
+          reviewId: reviewDocId || undefined,
+          language,
+          code,
+          review: reviewText,
+          summary,
+          comments,
+          improvedSnippet,
+          provider: env.LLM_PROVIDER,
+          model: env.LLM_MODEL,
+        }).save();
+      } catch {
+        // log if you want, but don't fail the request
+      }
     }
 
     return NextResponse.json({
@@ -125,8 +158,10 @@ export async function POST(req: NextRequest) {
       id: reviewDocId,
       saved: Boolean(reviewDocId),
     });
-  } catch (e) {
-    const msg = (e as Error)?.message ?? 'Unknown';
-    return NextResponse.json({ error: 'Failed to review code', details: msg }, { status: 500 });
+  } catch (e: unknown) {
+    return NextResponse.json(
+      { error: "Failed to review code", details: errorMessage(e) },
+      { status: 500 }
+    );
   }
 }
