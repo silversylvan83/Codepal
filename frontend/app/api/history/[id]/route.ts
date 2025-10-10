@@ -66,7 +66,10 @@ export async function DELETE(
 
   const doc = await HistoryModel.findById(id).exec();
   if (!doc) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+    return NextResponse.json(
+      { ok: false, error: "Not found" },
+      { status: 404 }
+    );
   }
 
   if (!doc.get("deletedAt")) {
