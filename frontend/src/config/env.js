@@ -1,4 +1,3 @@
-// src/config/env.js
 import 'dotenv/config';
 
 const must = (key, fallback) => {
@@ -16,8 +15,6 @@ export const env = {
     'MONGODB_URI',
     'mongodb+srv://vaishnavisanya28_db_user:YELoCWk4OlD9z5yl@cluster0.hlkduio.mongodb.net/'
   ),
-
-  
 
   // LLM (Gemini-only)
   LLM_PROVIDER: (process.env.LLM_PROVIDER ).toLowerCase(),
