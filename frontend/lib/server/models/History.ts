@@ -1,14 +1,9 @@
-// src/models/History.js
 import mongoose from 'mongoose';
 
 const CommentSchema = new mongoose.Schema(
   {
     line: { type: Number, default: 0 },
-    level: {
-      type: String,
-      enum: ['bug', 'performance', 'readability', 'security', 'info'],
-      default: 'info',
-    },
+    level: { type: String, enum: ['bug','performance','readability','security','info'], default: 'info' },
     message: { type: String, required: true },
   },
   { _id: false }
@@ -33,13 +28,8 @@ const HistorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Useful indexes
 HistorySchema.index({ createdAt: -1 });
 HistorySchema.index({ language: 1, createdAt: -1 });
-HistorySchema.index({ userId: 1, createdAt: -1 });
-HistorySchema.index({ snippetId: 1 });
-HistorySchema.index({ reviewId: 1 });
 
-// Hot-reload safe export
-export const History =
+export const HistoryModel =
   mongoose.models.History || mongoose.model('History', HistorySchema);

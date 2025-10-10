@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import CodeDiff from "@/components/CodeDiff";
 import ReviewPanel from "@/components/ReviewPanel";
-import { reviewCode } from "@/lib/api";
+import { reviewCode } from "@/lib/server/api";
 import { Play, FileJson2, Sparkles, ChevronDown } from "lucide-react";
 
 type Comment = { line: number; level: string; message: string };

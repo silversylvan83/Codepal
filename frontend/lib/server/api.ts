@@ -95,3 +95,5 @@ export const clearHistoryServer = async () => {
   if (!res.ok) throw new Error(data?.error || 'Failed to clear history');
   return data;
 };
+
+

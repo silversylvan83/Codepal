@@ -1,14 +1,9 @@
-// src/models/Review.js
 import mongoose from 'mongoose';
 
 const CommentSchema = new mongoose.Schema(
   {
     line: { type: Number, default: 0 },
-    level: {
-      type: String,
-      enum: ['bug', 'performance', 'readability', 'security', 'info'],
-      default: 'info',
-    },
+    level: { type: String, enum: ['bug','performance','readability','security','info'], default: 'info' },
     message: { type: String, required: true },
   },
   { _id: false }
@@ -29,6 +24,5 @@ const ReviewSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Avoid OverwriteModelError on hot-reload
-export const Review =
+export const ReviewModel =
   mongoose.models.Review || mongoose.model('Review', ReviewSchema);

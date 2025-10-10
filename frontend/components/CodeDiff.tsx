@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Copy, WrapText, Type, SunMedium, Moon, Sparkles } from 'lucide-react';
-import { reviewCode } from '@/lib/api';
+import { reviewCode } from '@/lib/server/api';
 import type { editor as MonacoEditorNS } from 'monaco-editor';
 
 const Editor = dynamic(
